@@ -9,8 +9,10 @@ config =
   lineHeight: 0
   lineIndents: [0, .15, .40, .10, 0, .30]
   colors: ["#dd7c5c", "#000", "#cdd156", "#7a9fba", "#b996ae"]
-  width: 500
-  height: 500
+  width: 680
+  height: 510
+  maxwidth: 1280
+  maxheight: 960
   fontFamily: "comicSans"
 
 
@@ -18,9 +20,17 @@ module.exports = (req, res) ->
 
   res.setHeader "content-type", "image/png"
 
-  fs.readFile __dirname+"/../doge.jpeg", (err, d) ->
+  if /^\d+(?:x\d+)?$/i.test(req.query.size)
+    [width,height] = req.query.size.split(/x/i)
+    width = Math.min(parseInt(width), config.maxwidth)
+    height = if height then Math.min(parseInt(height), config.maxheight) else width
+
+  width = width || config.width
+  height = height || config.height
+
+  fs.readFile __dirname+"/../reallybigdoge.jpeg", (err, d) ->
     message = formatMessage(req.path.split("/").slice(1))
-    canvas  = new Canvas(config.width, config.height)
+    canvas  = new Canvas(width, height)
     ctx     = canvas.getContext('2d')
 
     img     = new Canvas.Image
@@ -28,7 +38,7 @@ module.exports = (req, res) ->
 
     ctx.addFont(new Font("comicSans", "#{__dirname}/../fonts/cs.ttf"))
 
-    ctx.drawImage img, 0, 0, config.width, config.height
+    ctx.drawImage img, 0, 0, width, height
 
     drawMessage message
     canvas.pngStream().pipe(res)
