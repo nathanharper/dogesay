@@ -1,6 +1,5 @@
 fs     = require 'fs'
 Canvas = require 'canvas'
-lru    = require 'lru-cache'
 Font   = Canvas.Font
 canvas = null
 ctx    = null
@@ -8,38 +7,47 @@ caopt  =
   max: 50 * 1048576 # ~50M
   length: (n) -> n.length
   maxAge: 1000 * 60 * 60
-cache  = lru(caopt)
+cache  = require('lru-cache')(caopt)
 config =
   fontSize: 100
   wordsPerLine: 2
   lineHeight: 0
   lineIndents: [0, .15, .40, .10, 0, .30]
   colors: ["#dd7c5c", "#000", "#cdd156", "#7a9fba", "#b996ae"]
-  width: 680
-  height: 510
-  maxwidth: 1280
-  maxheight: 960
   fontFamily: "comicSans"
+  maxsize: [1280,1280]
+images =
+  base: # default
+    name: 'reallybigdoge.jpeg'
+    size: [680,510]
+  dogecoin:
+    name: 'dogecoin.png'
+    size: [300,300]
+  dogeface:
+    name: 'doge.jpeg'
+    size: [264,264]
 
 
 module.exports = (req, res) ->
 
   res.setHeader "content-type", "image/png"
 
+  imgdata = images[req.query.image] || images.base
+
   if req.query.size && req.query.size.match(/^\d+(?:x\d+)?$/i)
     [width,height] = req.query.size.split(/x/i)
-    width = Math.min(parseInt(width), config.maxwidth)
-    height = if height then Math.min(parseInt(height), config.maxheight) else width
+    width = Math.min(parseInt(width), config.maxsize[0])
+    height = if height then Math.min(parseInt(height), config.maxsize[1]) else width
 
-  width = width || config.width
-  height = height || config.height
+  width = width || imgdata.size[0]
+  height = height || imgdata.size[1]
 
-  cachekey = req.path + width + 'x' + height
+  cachekey = [req.path,imgdata.name,width,height].join()
 
   if cache.has(cachekey)
     res.end(cache.get(cachekey))
   else
-    fs.readFile __dirname+"/../reallybigdoge.jpeg", (err, d) ->
+    fs.readFile __dirname+"/../images/"+imgdata.name, (err, d) ->
       message = formatMessage(req.path.split("/").slice(1))
       canvas  = new Canvas(width, height)
       ctx     = canvas.getContext('2d')
