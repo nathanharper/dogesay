@@ -1,8 +1,14 @@
 fs     = require 'fs'
 Canvas = require 'canvas'
+lru    = require 'lru-cache'
 Font   = Canvas.Font
 canvas = null
 ctx    = null
+caopt  =
+  max: 50 * 1048576 # ~50M
+  length: (n) -> n.length
+  maxAge: 1000 * 60 * 60
+cache  = lru(caopt)
 config =
   fontSize: 100
   wordsPerLine: 2
@@ -28,20 +34,24 @@ module.exports = (req, res) ->
   width = width || config.width
   height = height || config.height
 
-  fs.readFile __dirname+"/../reallybigdoge.jpeg", (err, d) ->
-    message = formatMessage(req.path.split("/").slice(1))
-    canvas  = new Canvas(width, height)
-    ctx     = canvas.getContext('2d')
+  cachekey = req.path + width + 'x' + height
 
-    img     = new Canvas.Image
-    img.src = d
+  if cache.has(cachekey)
+    res.end(cache.get(cachekey))
+  else
+    fs.readFile __dirname+"/../reallybigdoge.jpeg", (err, d) ->
+      message = formatMessage(req.path.split("/").slice(1))
+      canvas  = new Canvas(width, height)
+      ctx     = canvas.getContext('2d')
+      img     = new Canvas.Image
+      img.src = d
 
-    ctx.addFont(new Font("comicSans", "#{__dirname}/../fonts/cs.ttf"))
+      ctx.addFont(new Font("comicSans", "#{__dirname}/../fonts/cs.ttf"))
+      ctx.drawImage img, 0, 0, width, height
+      drawMessage message
 
-    ctx.drawImage img, 0, 0, width, height
-
-    drawMessage message
-    canvas.pngStream().pipe(res)
+      cache.set(cachekey, canvas.toBuffer())
+      canvas.pngStream().pipe(res)
 
 removeExtension = (message) ->
   l = message.length - 1
